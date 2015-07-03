@@ -17,7 +17,10 @@ public class MainActivity extends Activity implements BluetoothListener {
 
 	private BluetoothLE ble = null;
     MainActivity mainActivity = this;
-    private EditText et_device;
+//    private EditText et_device;
+    private Button buttonStart;
+    private Button buttonSend;
+    private Button buttonClose;
 
 	
 	@Override
@@ -25,12 +28,11 @@ public class MainActivity extends Activity implements BluetoothListener {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.activity_main);
 
-
-        Button buttonStart = (Button)findViewById(R.id.buttonStart);
-        Button buttonSend = (Button)findViewById(R.id.buttonSend);
-        Button buttonAck = (Button)findViewById(R.id.buttonAck);
-        
-        et_device = (EditText)findViewById(R.id.device_name);
+        buttonStart = (Button)findViewById(R.id.buttonStart);
+        buttonSend = (Button)findViewById(R.id.buttonSend);
+        buttonClose = (Button)findViewById(R.id.buttonClose);
+        Button buttonReset = (Button)findViewById(R.id.buttonReset);
+//        et_device = (EditText)findViewById(R.id.device_name);
         
         buttonStart.setOnClickListener(new View.OnClickListener() {
 
@@ -39,7 +41,8 @@ public class MainActivity extends Activity implements BluetoothListener {
                 if(ble != null) {
                     return;
                 }
-                ble = new BluetoothLE(mainActivity, et_device.getText().toString());
+                ble = new BluetoothLE(mainActivity, "ket_002");
+                //ble = new BluetoothLE(mainActivity, et_device.getText().toString());
                 ble.bleConnect();
             }
 
@@ -51,25 +54,11 @@ public class MainActivity extends Activity implements BluetoothListener {
             public void onClick(View v) {
                 if(ble != null){
                     ble.bleWriteState((byte)0x06);
+                    buttonSend.setEnabled(false);
                 }
             }
 
         });
-
-        buttonAck.setOnClickListener(new View.OnClickListener(){
-
-            @Override
-            public void onClick(View view) {
-                if(ble != null){
-                    ble.bleWriteData((byte)0x05);
-                }
-            }
-        });
-        
-        
-        Log.i(TAG, "On create"); 
-        
-        Button buttonClose = (Button)findViewById(R.id.buttonClose);
 
         buttonClose.setOnClickListener(new View.OnClickListener() {
 
@@ -78,13 +67,26 @@ public class MainActivity extends Activity implements BluetoothListener {
                 if(ble != null) {
                     ble.bleDisconnect();
                     ble = null;
-
                 }
             }
 
         });
+        buttonSend.setEnabled(false);
+        buttonClose.setEnabled(false);
 
-	}
+        buttonReset.setOnClickListener(new View.OnClickListener(){
+
+            @Override
+            public void onClick(View view) {
+                if(ble != null){
+                    ble.bleWriteState((byte)0x00);
+                }
+            }
+        });
+
+        Log.i(TAG, "On create");
+
+    }
 
     @Override
     protected void onDestroy() {
@@ -93,7 +95,6 @@ public class MainActivity extends Activity implements BluetoothListener {
             ble.bleDisconnect();
         }
     }
-
 
     @Override
     public void onActivityResult(int requestCode, int resultCode, Intent data) {
@@ -104,7 +105,6 @@ public class MainActivity extends Activity implements BluetoothListener {
 
     @Override
     public void bleNotSupported() {
-
 //        this.finish();
     }
 
@@ -120,6 +120,9 @@ public class MainActivity extends Activity implements BluetoothListener {
     public void bleConnected() {
     	Toast.makeText(this, "BLE connected", Toast.LENGTH_SHORT).show();
         Log.i(TAG, "BLE connected");
+        buttonStart.setEnabled(false);
+        buttonSend.setEnabled(true);
+        buttonClose.setEnabled(true);
     }
 
     @Override
@@ -129,6 +132,9 @@ public class MainActivity extends Activity implements BluetoothListener {
         if(ble != null) {
             ble = null;
         }
+        buttonStart.setEnabled(true);
+        buttonSend.setEnabled(false);
+        buttonClose.setEnabled(false);
     }
 
     @Override
@@ -161,9 +167,15 @@ public class MainActivity extends Activity implements BluetoothListener {
         Log.i(TAG, "Color sensor readings");
     }
 
-	@Override
+    @Override
+    public void bleTakePictureSuccess() {
+        Toast.makeText(this, "Take picture successfully.", Toast.LENGTH_SHORT).show();
+        Log.i(TAG, "Take picture successfully.");
+        buttonSend.setEnabled(true);
+    }
+
+    @Override
 	public void bleElectrodeAdcReading(byte state, byte[] adcReading) {
 		// TODO Auto-generated method stub
-		
 	}
 }

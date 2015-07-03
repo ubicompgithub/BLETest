@@ -41,4 +41,7 @@ public interface BluetoothListener {
 
     /* Color sensor readings */
     void bleColorReadings(byte[] colorReadings);
+
+    /* Take picture successfully*/
+    void bleTakePictureSuccess();
 }

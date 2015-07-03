@@ -74,16 +74,19 @@ public class BluetoothLE {
     private File file;
     private Timestamp timestamp;
     private FileOutputStream fos;
+
+    byte[] tempBuf;
     int picTotalLen = 0;
     int pktNum = 0;
-    int tempPktId = 0;
-    int tempUARTPktId = 0;
     int lastPktSize = 0;
-    byte[] tempBuf;
-    int bufOffset = 0;
     int seqNum = 0;
-    boolean firstPkt = false;
-    boolean done = false;
+
+
+    int tempPktId = 0;
+    //int tempUARTPktId = 0;
+    int bufOffset = 0;
+    boolean picInfoPktRecv = false;
+    boolean picDataRecvDone = true;
 
 
     public BluetoothLE(Activity activity, String mDeviceName) {
@@ -173,18 +176,6 @@ public class BluetoothLE {
 
             } else if (BluetoothLeService.ACTION_DATA_AVAILABLE.equals(action)) {
             	byte[] data = intent.getByteArrayExtra(BluetoothLeService.EXTRA_DATA);
-
-//                String dataString = "";
-//                for(int i=0; i<data.length; i++) {
-//                    dataString += data[i] + " ";
-//                }
-//                Log.i(TAG, dataString);
-//
-//                if(testCount == 1) {
-//                    Log.i(TAG, "WRITE 0x03");
-//                    bleWriteState((byte)0x03);
-//                }
-//                testCount++;
             	
             	StringBuffer Sbuffer = new StringBuffer("");
             	for(int ii=0; ii<data.length; ii++){
@@ -192,12 +183,13 @@ public class BluetoothLE {
             		String s1 = Integer.toHexString(data[ii] & 0xFF);
             		Sbuffer.append(s1 + ",");
             	}
-            	//Log.i(TAG, Sbuffer.toString());
+//            	Log.i(TAG, Sbuffer.toString());
 
 
                 if(data[0] == (byte)0xA7){
                     seqNum = (data[2] & 0xFF)*256 + (data[1] & 0xFF);
 
+//                    // Checksum for BLE packet
 //                    int checksum = 0;
 //                    for(int i = 0; i < data.length-1; i++){
 //                        checksum += (data[i] & 0xFF);
@@ -209,15 +201,18 @@ public class BluetoothLE {
 //                    }
 
                     if( seqNum == 0x7FFF){
-                        if( firstPkt == false ) {
-                            firstPkt = true;
-                            done = false;
+                        if( picInfoPktRecv == false ) {
+                            picInfoPktRecv = true;
+                            picDataRecvDone = false;
+                            tempPktId = 0;
+                            bufOffset = 0;
                             picTotalLen = (data[4] & 0xFF) * 256 + (data[3] & 0xFF);
-                            pktNum = picTotalLen / 16;
-                            if (pktNum % 16 != 0) {
+                            pktNum = picTotalLen / (128 - 6);
+                            if (pktNum % (128 - 6) != 0) {
                                 pktNum++;
-                                lastPktSize = picTotalLen % 16;
+                                lastPktSize = picTotalLen % (128 - 6) + 6;
                             }
+                            //bleWriteData((byte) 0x05);
                             Log.d(TAG, "Total picture length:".concat(String.valueOf(picTotalLen)));
                             Log.d(TAG, "Total packets:".concat(String.valueOf(pktNum)));
                             Log.d(TAG, "Last packet size:".concat(String.valueOf(lastPktSize)));
@@ -235,7 +230,6 @@ public class BluetoothLE {
 
 //                        if (mainDirectory == null)
 //                            mainDirectory = new File(mainStorage.getAbsolutePath(), String.valueOf(timestamp));
-//
 //                        if (!mainDirectory.exists())
 //                            mainDirectory.mkdirs();
 
@@ -247,13 +241,16 @@ public class BluetoothLE {
                                 fos = null;
                             }
                         }
+                        else{
+                            bleWriteData((byte) 0x05);
+                        }
                     }
                     else{
-                        if( done == false ) {
-                            //Log.d(TAG, "Sequence number:".concat(String.valueOf(seqNum)));
-                            if( seqNum / 8 < tempUARTPktId ) {
+                        if( picDataRecvDone == false ) {
+                            if( seqNum / 8 < tempPktId ) {
+                                //bleWriteData((byte) (0xF0|(0xFF & tempPktId)));
                                 bleWriteData((byte) 0x05);
-                                Log.d(TAG, "Packet has been received.".concat(String.valueOf(seqNum / 8)).concat(String.valueOf(tempUARTPktId)));
+                                Log.d(TAG, "Packet has been received.".concat(String.valueOf(seqNum / 8)).concat(String.valueOf(tempPktId)));
                                 return;
                             }
 
@@ -264,16 +261,18 @@ public class BluetoothLE {
 
                             System.arraycopy(data, 3, tempBuf, bufOffset, data.length - 4);
                             bufOffset += (data.length - 4);
-                            tempPktId++;
 
-                            if (bufOffset == 128 || tempPktId == pktNum) {
+                            if ( bufOffset == 128 || ((tempPktId == pktNum - 1) && bufOffset == lastPktSize) ) {
+                                tempPktId++;
+                                if (tempPktId == pktNum) {
+                                    Log.d(TAG, "LastDataRecvLength: ".concat(String.valueOf(bufOffset)).concat(
+                                            " LastDataLength: ").concat(String.valueOf(lastPktSize)));
+                                }
                                 int sum = 0;
                                 for(int i = 0; i < bufOffset-2; i++){
-                                    //Log.d(TAG, Integer.toHexString(sum & 0xFF).concat(" ").concat(Integer.toHexString(tempBuf[i] & 0xFF)));
                                     sum += (tempBuf[i] & 0xFF);
                                     sum = sum & 0xFF;
                                 }
-                                //Log.d(TAG, Integer.toHexString(sum & 0xFF).concat(" ").concat(Integer.toHexString(tempBuf[bufOffset - 2] & 0xFF)));
 
                                 if (( sum & 0xFF ) == (tempBuf[bufOffset-2] & 0xFF) ){
                                     Log.d(TAG, String.valueOf(tempPktId).concat(" packets recieved."));
@@ -281,20 +280,21 @@ public class BluetoothLE {
                                     System.arraycopy(tempBuf, 4, byteToWrite, 0, bufOffset - 6);
                                     try {
                                         fos.write(byteToWrite);
-                                        //Log.d(TAG, "Append to file");
                                         bufOffset = 0;
-                                        tempUARTPktId++;
                                         bleWriteData((byte) 0x05);
-
+                                        bleWriteData((byte) 0x05);
+                                        bleWriteData((byte) 0x05);
+                                        picInfoPktRecv = false;
                                         if (tempPktId == pktNum) {
                                             Log.d(TAG, "Can not enter here more than 1 time.");
                                             try {
                                                 fos.close();
-                                                firstPkt = false;
+                                                picInfoPktRecv = false;
+                                                picDataRecvDone = true;
                                                 tempPktId = 0;
-                                                tempUARTPktId = 0;
-                                                done = true;
+                                                bufOffset = 0;
                                                 bleWriteState((byte)0x07);
+                                                ((BluetoothListener) activity).bleTakePictureSuccess();
                                             } catch (IOException e) {
                                                 e.printStackTrace();
                                             }
@@ -303,9 +303,8 @@ public class BluetoothLE {
                                         e.printStackTrace();
                                     }
                                 }else{
-                                    Log.d(TAG, "Checksum error in ".concat(String.valueOf(tempPktId/8)).concat("th packet."));
+                                    Log.d(TAG, "Checksum error in ".concat(String.valueOf(tempPktId)).concat("th packet."));
                                     bufOffset = 0;
-                                    tempPktId = tempUARTPktId*8;
                                 }
                             }
                         }
@@ -454,8 +453,7 @@ public class BluetoothLE {
 	}
 
     // Device scan callback.
-    private BluetoothAdapter.LeScanCallback mLeScanCallback =
-            new BluetoothAdapter.LeScanCallback() {
+    private BluetoothAdapter.LeScanCallback mLeScanCallback = new BluetoothAdapter.LeScanCallback() {
                 @Override
                 public void onLeScan(final BluetoothDevice device, int rssi, byte[] scanRecord) {
                     // Do nothing if target device is scanned

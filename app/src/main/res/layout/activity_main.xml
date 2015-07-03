@@ -8,31 +8,33 @@
         android:id="@+id/buttonStart"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Start" />
+        android:text="Start connection" />
 
     <Button
         android:id="@+id/buttonClose"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Close" />
+        android:text="Close app" />
+
     <Button
         android:id="@+id/buttonSend"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Send" />
+        android:text="Take picture" />
+
     <Button
-        android:id="@+id/buttonAck"
+        android:id="@+id/buttonReset"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Ack" />
+        android:text="Reset" />
 
-    <EditText
-        android:id="@+id/device_name"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:ems="10" >
+    <!--<EditText-->
+        <!--android:id="@+id/device_name"-->
+        <!--android:layout_width="match_parent"-->
+        <!--android:layout_height="wrap_content"-->
+        <!--android:ems="10" >-->
 
-        <requestFocus />
-    </EditText>
+        <!--<requestFocus />-->
+    <!--</EditText>-->
 
 </LinearLayout>
