@@ -34,3 +34,10 @@ proguard/
 # osx
 .DS_Store
 *.swp
+
+# opencv lib
+libraries/opencv/src/org/
+libraries/opencv/javadoc/
+
+# JNI lib
+app/src/main/jniLibs/

@@ -27,6 +27,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.Writer;
 import java.sql.Timestamp;
+import java.util.Hashtable;
 import java.util.List;
 import java.util.UUID;
 
@@ -37,6 +38,7 @@ public class BluetoothLE {
     // Write UUID
     public static final UUID SERVICE4_WRITE_STATE_CHAR1 = UUID.fromString("0000fff1-0000-1000-8000-00805f9b34fb");
     public static final UUID SERVICE4_WRITE_STATE_CHAR3 = UUID.fromString("0000fff3-0000-1000-8000-00805f9b34fb");
+    public static final UUID SERVICE4_WRITE_STATE_CHAR6 = UUID.fromString("0000fff6-0000-1000-8000-00805f9b34fb");
 
 	// Notification UUID
 	private static final UUID SERVICE4 = UUID.fromString("0000fff0-0000-1000-8000-00805f9b34fb");
@@ -59,6 +61,7 @@ public class BluetoothLE {
     private BluetoothGattCharacteristic mNotifyCharacteristic;
     private BluetoothGattCharacteristic mWriteStateCharacteristic1;
     private BluetoothGattCharacteristic mWriteStateCharacteristic3;
+    private BluetoothGattCharacteristic mWriteStateCharacteristic6;
 
     private Handler mHandler;
     private Runnable mRunnable;
@@ -70,7 +73,7 @@ public class BluetoothLE {
 
     // Write binary file
     private File mainStorage = null;
-    private File mainDirectory = null;
+//    private File mainDirectory = null;
     private File file;
     private Timestamp timestamp;
     private FileOutputStream fos;
@@ -83,17 +86,15 @@ public class BluetoothLE {
 
 
     int tempPktId = 0;
-    //int tempUARTPktId = 0;
     int bufOffset = 0;
     boolean picInfoPktRecv = false;
     boolean picDataRecvDone = true;
 
+    Hashtable<Integer, byte []> hashBuf;
 
     public BluetoothLE(Activity activity, String mDeviceName) {
         mHandler = new Handler();
-
         this.activity = activity;
-
         this.mDeviceName = mDeviceName;
 
         // Use this check to determine whether BLE is supported on the device.  Then you can
@@ -165,6 +166,7 @@ public class BluetoothLE {
 
                 mWriteStateCharacteristic1 = gattServices.get(3).getCharacteristic(SERVICE4_WRITE_STATE_CHAR1);
                 mWriteStateCharacteristic3 = gattServices.get(3).getCharacteristic(SERVICE4_WRITE_STATE_CHAR3);
+                mWriteStateCharacteristic6 = gattServices.get(3).getCharacteristic(SERVICE4_WRITE_STATE_CHAR6);
 
                 Log.i(TAG, "BLE ACTION_GATT_SERVICES_DISCOVERED");
 
@@ -183,7 +185,7 @@ public class BluetoothLE {
             		String s1 = Integer.toHexString(data[ii] & 0xFF);
             		Sbuffer.append(s1 + ",");
             	}
-//            	Log.i(TAG, Sbuffer.toString());
+            	Log.i(TAG, Sbuffer.toString());
 
 
                 if(data[0] == (byte)0xA7){
@@ -212,7 +214,7 @@ public class BluetoothLE {
                                 pktNum++;
                                 lastPktSize = picTotalLen % (128 - 6) + 6;
                             }
-                            //bleWriteData((byte) 0x05);
+                            //bleWriteAck((byte) 0x05);
                             Log.d(TAG, "Total picture length:".concat(String.valueOf(picTotalLen)));
                             Log.d(TAG, "Total packets:".concat(String.valueOf(pktNum)));
                             Log.d(TAG, "Last packet size:".concat(String.valueOf(lastPktSize)));
@@ -242,14 +244,14 @@ public class BluetoothLE {
                             }
                         }
                         else{
-                            bleWriteData((byte) 0x05);
+                            bleWriteAck((byte) 0x05);
                         }
                     }
                     else{
                         if( picDataRecvDone == false ) {
                             if( seqNum / 8 < tempPktId ) {
-                                //bleWriteData((byte) (0xF0|(0xFF & tempPktId)));
-                                bleWriteData((byte) 0x05);
+                                //bleWriteAck((byte) (0xF0|(0xFF & tempPktId)));
+                                bleWriteAck((byte) 0x05);
                                 Log.d(TAG, "Packet has been received.".concat(String.valueOf(seqNum / 8)).concat(String.valueOf(tempPktId)));
                                 return;
                             }
@@ -280,10 +282,15 @@ public class BluetoothLE {
                                     System.arraycopy(tempBuf, 4, byteToWrite, 0, bufOffset - 6);
                                     try {
                                         fos.write(byteToWrite);
+                                        ((BluetoothListener) activity).updateProcessRate((float)tempPktId*100/pktNum );
+
                                         bufOffset = 0;
-                                        bleWriteData((byte) 0x05);
-                                        bleWriteData((byte) 0x05);
-                                        bleWriteData((byte) 0x05);
+                                        if(tempPktId == pktNum || tempPktId % 2 == 1) {
+//                                            bleWriteAck((byte) 0x05);
+//                                            bleWriteAck((byte) 0x05);
+//                                            bleWriteAck((byte) 0x05);
+//                                            bleWriteAck((byte) 0x05);
+                                        }
                                         picInfoPktRecv = false;
                                         if (tempPktId == pktNum) {
                                             Log.d(TAG, "Can not enter here more than 1 time.");
@@ -295,6 +302,7 @@ public class BluetoothLE {
                                                 bufOffset = 0;
                                                 bleWriteState((byte)0x07);
                                                 ((BluetoothListener) activity).bleTakePictureSuccess();
+                                                ((BluetoothListener) activity).showImgPreview(file.getAbsolutePath());
                                             } catch (IOException e) {
                                                 e.printStackTrace();
                                             }
@@ -304,12 +312,20 @@ public class BluetoothLE {
                                     }
                                 }else{
                                     Log.d(TAG, "Checksum error in ".concat(String.valueOf(tempPktId)).concat("th packet."));
+                                    tempPktId--;
                                     bufOffset = 0;
                                 }
                             }
                         }
                     }
 
+                }
+                else if (data[0] == (byte)0xFA){
+                    ((BluetoothListener) activity).displayCurrentId("None");
+                }
+                else if (data[0] == (byte)0xFB){
+                    long temp = (data[5] & 0xFF) + (data[4] & 0xFF)*256 + (data[3] & 0xFF)*256*256 + (data[2] & 0xFF)*256*256*256 + (data[1] & 0xFF)*256*256*256*256;
+                    ((BluetoothListener) activity).displayCurrentId(String.valueOf(temp));
                 }
 //            	byte[] plugId = new byte[data.length-1];
 //            	System.arraycopy(data, 1, plugId, 0, data.length - 1);
@@ -401,11 +417,19 @@ public class BluetoothLE {
         return;
     }
 
-    public void bleWriteData(byte data) {
+    public void bleWriteAck(byte data) {
 
         if((mBluetoothLeService != null) && (mWriteStateCharacteristic3 != null)) {
             mWriteStateCharacteristic3.setValue(new byte[] { data });
             mBluetoothLeService.writeCharacteristic(mWriteStateCharacteristic3);
+        }
+        return;
+    }
+
+    public void bleWriteId(byte [] bytes){
+        if((mBluetoothLeService != null) && (mWriteStateCharacteristic6 != null)) {
+            mWriteStateCharacteristic6.setValue(bytes);
+            mBluetoothLeService.writeCharacteristic(mWriteStateCharacteristic6);
         }
         return;
     }

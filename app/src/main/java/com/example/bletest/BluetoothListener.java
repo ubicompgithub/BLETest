@@ -3,6 +3,7 @@ package com.example.bletest;
 import android.app.Activity;
 import android.content.Intent;
 
+
 public interface BluetoothListener {
 	
 	public Activity activity = null;
@@ -44,4 +45,16 @@ public interface BluetoothListener {
 
     /* Take picture successfully*/
     void bleTakePictureSuccess();
+
+    /* Update process rate*/
+    void updateProcessRate(float rate);
+
+    /* Clear process rate*/
+    void clearProcesssRate();
+
+    /* Show image preview*/
+    void showImgPreview(String filePath);
+
+    /* Display current saliva Id*/
+    void displayCurrentId(String id);
 }
