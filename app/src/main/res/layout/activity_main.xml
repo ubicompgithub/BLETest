@@ -11,68 +11,84 @@
     <LinearLayout
         android:orientation="vertical"
         android:layout_width="fill_parent"
-        android:layout_height="fill_parent">
+        android:layout_height="fill_parent"
+        android:gravity="center">
 
     <Button
         android:id="@+id/buttonStart"
-        android:layout_width="wrap_content"
+        android:layout_width="130sp"
         android:layout_height="wrap_content"
         android:text="Start connection" />
 
     <Button
         android:id="@+id/buttonClose"
-        android:layout_width="wrap_content"
+        android:layout_width="130sp"
         android:layout_height="wrap_content"
         android:text="Close app" />
 
     <Button
-        android:id="@+id/buttonSend"
-        android:layout_width="wrap_content"
+        android:id="@+id/buttonPreCap"
+        android:layout_width="130sp"
+        android:layout_height="wrap_content"
+        android:text="Get ROI range" />
+
+
+    <Button
+        android:id="@+id/buttonCap"
+        android:layout_width="130sp"
         android:layout_height="wrap_content"
         android:text="Take picture" />
 
     <Button
         android:id="@+id/buttonReset"
-        android:layout_width="wrap_content"
+        android:layout_width="130sp"
         android:layout_height="wrap_content"
         android:text="Ble Reset" />
 
     <Button
         android:id="@+id/buttonWriteId"
-        android:layout_width="wrap_content"
+        android:layout_width="130sp"
         android:layout_height="wrap_content"
         android:text="Write Id" />
 
     <TextView
-        android:id="@+id/progressBar"
-        android:layout_width="match_parent"
+        android:id="@+id/progressDisplay"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:textSize = "44sp"
+        android:gravity="center"
+        android:textSize = "36sp"
         android:ems="10" />
 
 
     <ImageView
-        android:id="@+id/imageView1"
+        android:id="@+id/imgPreview"
         android:layout_width="160sp"
         android:layout_height="120sp"
-        android:layout_below="@+id/progressBar"
-        android:layout_centerHorizontal="true"
-        android:layout_marginTop="17dp" />
-
-    <EditText
-        android:id="@+id/editTest1"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_below="@+id/imageView1"
-        android:layout_centerHorizontal="true"
-        android:layout_marginTop="17dp" />
+        android:layout_below="@+id/progressDisplay"
+        android:layout_centerHorizontal="true" />
 
     <TextView
-        android:id="@+id/idBar"
+        android:id="@+id/detectionResult"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:textSize = "20sp"
-        android:ems="10" />
+        android:gravity="center" />
+
+    <EditText
+        android:id="@+id/editArea"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@+id/imgPreview"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="10dp" />
+
+    <TextView
+        android:id="@+id/idDisplay"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textSize = "20sp"
+        android:ems="10"
+        android:gravity="center"/>
         
     </LinearLayout>
     </ScrollView>

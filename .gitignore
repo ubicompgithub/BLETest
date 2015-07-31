@@ -41,3 +41,6 @@ libraries/opencv/javadoc/
 
 # JNI lib
 app/src/main/jniLibs/
+
+# Backup file
+*.zip
