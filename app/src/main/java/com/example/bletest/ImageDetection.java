@@ -26,7 +26,7 @@ public class ImageDetection {
 
     private static final int ROI_X_MIN = 80;
     private static final int ROI_X_MAX = 240;
-    private static final int ROI_Y_MIN = 60;
+    private static final int ROI_Y_MIN = 80;
     private static final int ROI_Y_MAX = 160;
 
     private static final int DEFAULT_X_MIN = 45;
@@ -34,8 +34,24 @@ public class ImageDetection {
     private static final int DEFAULT_Y_MIN = 20;
     private static final int DEFAULT_Y_MAX = 50;
 
-    private static final int whiteThreshold = 230;
-    private static final int minimalRange = 50;
+    private static final int WHITE_THRESHOLD = 200;
+    private static final int VALID_THRESHOLD = -15;
+    private static final int MINIMAL_EFFECTIVE_RANGE = 20;
+
+    private static final int LBOUND_BETWEEN_LINE = 30;
+    private static final int UBOUND_BETWEEN_LINE = 45;
+
+    private static final int LBOUND_EFFECTIVE_GRAYSCALE = 40;
+    private static final float NO_LINE_PENALTY = 1;
+
+    private static final int LBOUND_FIRST_LINE_RANGE = 20;
+    private static final int UBOUND_FIRST_LINE_RANGE = 40;
+
+    private static final int FIRST_LINE_UNFOUND_PENALTY = 1;
+    private static final int SECOND_LINE_UNFOUND_PENALTY = 1;
+    private static final int FOUND_REWARD = 4;
+
+    private static final float eps = (float) -0.000001;
 
     private Activity activity = null;
     private DataTransmission datatransmission = null;
@@ -54,26 +70,29 @@ public class ImageDetection {
     public void roiDetectionOnWhite(Bitmap bitmap){
         Mat matOrigin = new Mat();
         Utils.bitmapToMat(bitmap, matOrigin);
-        Mat matROI = matOrigin.submat(ROI_Y_MIN, ROI_Y_MAX, ROI_X_MIN, ROI_X_MAX);
+
+        //Mat matROI = matOrigin.submat(ROI_Y_MIN, ROI_Y_MAX, ROI_X_MIN, ROI_X_MAX);
 
         //Mat matClone = new Mat(matROI.cols(),matROI.rows(), CvType.CV_8UC1);
         //Imgproc.cvtColor(matROI, matClone, Imgproc.COLOR_RGB2GRAY);
 
-        Bitmap roiBmp = Bitmap.createBitmap(matROI.cols(), matROI.rows(), Bitmap.Config.ARGB_4444);
-        Utils.matToBitmap(matROI, roiBmp);
+        //Bitmap roiBmp = Bitmap.createBitmap(matROI.cols(), matROI.rows(), Bitmap.Config.ARGB_4444);
+        //Utils.matToBitmap(matROI, roiBmp);
 
-        int w = roiBmp.getWidth();
-        int h = roiBmp.getHeight();
+        Bitmap roiBmp = Bitmap.createBitmap(bitmap, ROI_X_MIN, ROI_Y_MIN, ROI_X_MAX-ROI_X_MIN, ROI_Y_MAX-ROI_Y_MIN);
+
+        int width = roiBmp.getWidth();
+        int height = roiBmp.getHeight();
 
         int xSum = 0;
         int ySum = 0;
         int count = 0;
 
-        for(int i = 0; i < h; i++){
-            for (int j = 0; j < w; j++) {
+        for(int i = 0; i < height; i++){
+            for (int j = 0; j < width; j++) {
                 int pixel = roiBmp.getPixel(j, i);
                 int value = ((pixel >> 16) & 0xff);
-                if (value > whiteThreshold) {
+                if (value > WHITE_THRESHOLD) {
                     xSum += j;
                     ySum += i;
                     count++;
@@ -87,7 +106,7 @@ public class ImageDetection {
         xmin = xCenter - 45;
         xmax = xCenter + 45;
         ymin = yCenter - 15;
-        ymax = yCenter + 25;
+        ymax = yCenter + 15;
 
         Log.i(TAG, "xmin: "+ xmin + ", xmax: " + xmax + ", ymin: " + ymin + ", ymax: " + ymax);
 
@@ -128,33 +147,39 @@ public class ImageDetection {
 
 
     public boolean testStripDetection(Bitmap bitmap){
-        Bitmap roiBmp = Bitmap.createBitmap(bitmap, ROI_X_MIN + xmin + 3, ROI_Y_MIN + ymin + 3, xmax - xmin - 6, ymax -ymin-6);
-        int w = roiBmp.getWidth();
-        int h = roiBmp.getHeight();
-        Log.i(TAG, "width: " + w + " , height: " + h);
 
-        final float eps = (float) -0.000001;
-        float [] x0 = new float[w];
-        float [] diff = new float[w-1];
-        float [] pivot = new float[w-2];
+        Bitmap roiBmp = Bitmap.createBitmap(bitmap, ROI_X_MIN + xmin + 2, ROI_Y_MIN + ymin + 1, xmax - xmin - 4, ymax - ymin - 2);
+        int width = roiBmp.getWidth();
+        int height = roiBmp.getHeight();
+        int middle = width/2;
+        Log.i(TAG, "width: " + width + " , height: " + height);
+
+        Mat matROI = new Mat();
+        Utils.bitmapToMat(roiBmp, matROI);
+
+
+        float [] x0 = new float[width];
+        float [] diff = new float[width-1];
+        float [] pivot = new float[width-2];
+        float validatity = 0;
         float check = 0;
 
-        for(int i = 0; i < h; i++){
+        for(int i = 0; i < height; i++){
             float maximum = 0;
             float minimum = 255;
             float sumAll= 0;
-            float sumAfter50 = 0;
-            float maximumAfter50 = 0;
-            float minimumAfter50 = 255;
+            float sumAfterMiddle = 0;
+            float maximumAfterMiddle = 0;
+            float minimumAfterMiddle = 255;
             Vector vector = new Vector();
-            for (int j = 0; j < w; j++) {
+            for (int j = 0; j < width; j++) {
                 //int pixel = image.getRGB(j, i);
                 int pixel = roiBmp.getPixel(j, i);
                 int value = 255 - ((pixel >> 16) & 0xff);
                 x0[j] = value;
                 sumAll += x0[j];
-                if(j >= 50){
-                    sumAfter50 += x0[j];
+                if(j >= middle){
+                    sumAfterMiddle += x0[j];
                 }
 
                 if( j > 0 ){
@@ -176,29 +201,29 @@ public class ImageDetection {
                 if(x0[j] < minimum)
                     minimum = x0[j];
 
-                if(j >= 50){
-                    if(x0[j] > maximumAfter50)
-                        maximumAfter50 = x0[j];
+                if(j >= middle){
+                    if(x0[j] > maximumAfterMiddle)
+                        maximumAfterMiddle = x0[j];
 
-                    if(x0[j] < minimumAfter50)
-                        minimumAfter50 = x0[j];
+                    if(x0[j] < minimumAfterMiddle)
+                        minimumAfterMiddle = x0[j];
                 }
 
             }
-            float avgAll = sumAll /w;
-            if( (maximum - minimum) < minimalRange ){
+            float avgAll = sumAll /width;
+            if( (maximum - minimum) < MINIMAL_EFFECTIVE_RANGE ){
                 Log.i(TAG, "Useless row.");
-                if( avgAll > 50) {
-                    check -= 0.5;                               // MOdified by larry on 7/27
+                if( avgAll > LBOUND_EFFECTIVE_GRAYSCALE) {
+                    validatity -= NO_LINE_PENALTY;
+                    //check -= 0.5;                               // Modified by larry on 7/27
                 }
                 continue;
             }
 
 
-
-            float avgAfter50 = sumAfter50 /(w-50);
-            float sel = (maximum-minimum)/5;
-            float selAfter50 = (maximumAfter50-minimumAfter50)/5;
+            float avgAfterMiddle = sumAfterMiddle /middle;
+            float sel = (maximum-minimum)/4;
+            float selAfterMiddle = (maximumAfterMiddle-minimumAfterMiddle)/4;
             float refCandidate = 0;
             boolean isFoundRef = false;
             int refIdx = 0;
@@ -206,27 +231,24 @@ public class ImageDetection {
             int secondIdx = 0;
 
 //            Log.i(TAG, "Avg: " + String.valueOf(avgAll));
-//            Log.i(TAG, "AvgAfter50: " + String.valueOf(avgAfter50));
+//            Log.i(TAG, "AvgAfter50: " + String.valueOf(avgAfterMiddle));
 //            Log.i(TAG, "Sel: " + String.valueOf(sel));
-//            Log.i(TAG, "SelAfter50: " + String.valueOf(selAfter50));
+//            Log.i(TAG, "SelAfter50: " + String.valueOf(selAfterMiddle));
 
-            if(vector.size() <= 1){
-                Log.i(TAG, "Can't find refPoint in " + i + "th row.");
-                check -= 1;
-                continue;
-            }
 
             Vector candidateVector = new Vector();
 //            Log.i(TAG, "K = " + vector.size());
             for(int k= 0; k < vector.size(); k++) {
                 int idx = (int) vector.get(k);
 
-                if (idx > 20 && idx <= 40) {
+                if (idx > LBOUND_FIRST_LINE_RANGE && idx <= UBOUND_FIRST_LINE_RANGE) {
                     if (x0[idx] - avgAll > sel) {
                         candidateVector.add(idx);
                         Log.i(TAG, "Reference in Id:" + idx);
                     }
-                } else if (idx > 40 && isFoundRef == false) {
+                }
+
+                if (idx > UBOUND_FIRST_LINE_RANGE && isFoundRef == false) {
                     for (int m = 0; m < candidateVector.size(); m++) {
                         int tempIdx = (int) candidateVector.get(m);
                         if (x0[tempIdx] > refCandidate) {
@@ -236,43 +258,77 @@ public class ImageDetection {
                     }
                     if (refIdx == 0) {
                         Log.i(TAG, "Can't find refPoint in " + i + "th row.");
-                        check -= 1;
+                        validatity -= FIRST_LINE_UNFOUND_PENALTY;
+                        //check -= 1;
                         break;
                     }
-                    isFoundRef = true;
-                } else if (idx > 50 && isFoundRef == true) {
-                    if (x0[idx] - avgAfter50 > selAfter50) {
+                    else{
+                        Point point = new Point(refIdx, i);
+                        Imgproc.circle(matROI, point, 1, new Scalar(0, 255, 0), 1);
+                        isFoundRef = true;
+                    }
+                }
+
+                if (idx > middle && isFoundRef == true) {
+                    if (x0[idx] - avgAfterMiddle > selAfterMiddle) {
                         if (secondMaximal < x0[idx]) {
                             secondMaximal = x0[idx];
                             secondIdx = idx;
                         }
                     }
                 }
-                else{
-
-                }
 
                 if (k == vector.size() - 1) {
-                    if (secondIdx != 0 && (secondIdx - refIdx) > 30 && (secondIdx - refIdx) < 45) {
+                    if (secondIdx != 0 && (secondIdx - refIdx) > LBOUND_BETWEEN_LINE && (secondIdx - refIdx) < UBOUND_BETWEEN_LINE) {
                         Log.i(TAG, "Second: " + secondIdx);
-                        check += 4;
+                        Point point = new Point(secondIdx, i);
+                        Imgproc.circle(matROI, point, 1, new Scalar(0, 0, 255), 1);
+                        check += FOUND_REWARD;
                     } else {
                         Log.i(TAG, "Failed" );
-                        check -= 1;
+                        check -= SECOND_LINE_UNFOUND_PENALTY;
                     }
                     break;
                 }
             }
         }
 
+        Log.i(TAG, "Validatity: " + String.valueOf(validatity));
+        if(validatity < VALID_THRESHOLD)
+            check = -1000;
+
+
         Log.i(TAG, "Check: " + String.valueOf(check));
         Bundle countBundle = new Bundle();
         countBundle.putFloat("check", check);
-
         Message msg = new Message();
         msg.what = MainActivity.SHOW_PREDICTION_MSG;
         msg.setData(countBundle);
         ((MainActivity) activity).mHandler.sendMessage(msg);
+
+
+        String picturePath = datatransmission.file.getAbsolutePath();
+        String roiPath = picturePath.substring(0, picturePath.lastIndexOf(".")).concat("_2.jpg");
+
+        File file = new File(roiPath); // the File to save to
+        FileOutputStream fout = null;
+
+        try {
+            fout = new FileOutputStream(file);
+            Bitmap labelBmp = Bitmap.createBitmap(matROI.cols(), matROI.rows(), Bitmap.Config.ARGB_4444);
+            Utils.matToBitmap(matROI, labelBmp);
+            labelBmp.compress(Bitmap.CompressFormat.JPEG, 50, fout);
+            countBundle = new Bundle();
+            countBundle.putString("picturePath", file.getAbsolutePath());
+
+            msg = new Message();
+            msg.what = MainActivity.PICTURE_PREVIEW_MSG;
+            msg.setData(countBundle);
+            ((MainActivity) activity).mHandler.sendMessage(msg);
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        }
+
 
         if(check > 0)
             return true;

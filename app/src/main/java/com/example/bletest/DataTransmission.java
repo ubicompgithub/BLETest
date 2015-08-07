@@ -49,6 +49,8 @@ public class DataTransmission {
     private Timer timer = null;
     private int counter = 0;
 
+    private int debugCounter = 0;
+
 
     public DataTransmission(Activity activity, BluetoothLE ble){
         this.activity = activity;
@@ -118,6 +120,12 @@ public class DataTransmission {
             if(bufOffset == 0){
                 tempPktId = seqNum/8;
             }
+
+            /* For debugging*/
+//            if((tempPktId == ㄦㄦㄦㄦpktNum/2 || tempPktId == pktNum-1) && debugCounter <= 12){
+//                debugCounter++;
+//                return;
+//            }
 
             if(integerSet.contains(tempPktId)){
                 Log.i(TAG, tempPktId + "has been received repeatedly.");
@@ -211,13 +219,13 @@ public class DataTransmission {
                     }
                     else{
                         //imageDetection.roiDetection(bitmap);  // Previous recognition method
-                        Bundle countBundle = new Bundle();
-                        countBundle.putString("picturePath", file.getAbsolutePath());
-
-                        Message msg = new Message();
-                        msg.what = MainActivity.PICTURE_PREVIEW_MSG;
-                        msg.setData(countBundle);
-                        ((MainActivity) activity).mHandler.sendMessage(msg);
+//                        Bundle countBundle = new Bundle();
+//                        countBundle.putString("picturePath", file.getAbsolutePath());
+//
+//                        Message msg = new Message();
+//                        msg.what = MainActivity.PICTURE_PREVIEW_MSG;
+//                        msg.setData(countBundle);
+//                        ((MainActivity) activity).mHandler.sendMessage(msg);
 
                         imageDetection.testStripDetection(bitmap);
                     }
@@ -262,6 +270,7 @@ public class DataTransmission {
         picInfoPktRecv = false;
         recvNum = 0;
         bufOffset = 0;
+        debugCounter = 0;
 
         for(int i = 0; i < maximumPktNum; i++){
             picBuf[i] = null;

@@ -201,7 +201,7 @@ public class BluetoothLE {
 //
 ////                    // Checksum for BLE packet
 ////                    int checksum = 0;
-////                    for(int i = 0; i < data.length-1; i++){
+////                    for(int i =  0; i < data.length-1; i++){
 ////                        checksum += (data[i] & 0xFF);
 ////                        checksum = checksum & 0xFF;
 ////                    }
