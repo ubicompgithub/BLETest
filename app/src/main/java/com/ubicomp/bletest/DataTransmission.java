@@ -1,4 +1,4 @@
-package com.example.bletest;
+package com.ubicomp.bletest;
 
 import android.app.Activity;
 import android.graphics.Bitmap;
@@ -49,7 +49,12 @@ public class DataTransmission {
     private Timer timer = null;
     private int counter = 0;
 
-    private int debugCounter = 0;
+    private static final int NORMAL_TRANSMIT_STATE = 0;
+    private static final int RETRANSMIT_STATE = 1;
+    private static final int RECV_AFTER_RETRANMIT_STATE = 2;
+
+    private int retransmitState = NORMAL_TRANSMIT_STATE;
+
 
 
     public DataTransmission(Activity activity, BluetoothLE ble){
@@ -163,6 +168,10 @@ public class DataTransmission {
                     timer = new Timer();
                     timer.schedule(new TimeoutTask(), timeout);
 
+                    if (retransmitState == RETRANSMIT_STATE){
+                        retransmitState = RECV_AFTER_RETRANMIT_STATE;
+                    }
+
                     Bundle countBundle = new Bundle();
                     countBundle.putFloat("progress", (float) recvNum*100/pktNum);
 
@@ -270,7 +279,7 @@ public class DataTransmission {
         picInfoPktRecv = false;
         recvNum = 0;
         bufOffset = 0;
-        debugCounter = 0;
+        retransmitState = NORMAL_TRANSMIT_STATE;
 
         for(int i = 0; i < maximumPktNum; i++){
             picBuf[i] = null;
@@ -288,12 +297,24 @@ public class DataTransmission {
 
         @Override
         public void run() {
-            if(counter < 10){
+            if(counter < 4){
                 if(ble != null) {
                     Log.i(TAG, "Timeout timer was fired " + counter);
                     checkPackets();
                     counter++;
                     resetTimeoutTimer();
+
+                    if (retransmitState == NORMAL_TRANSMIT_STATE){
+                        retransmitState = RETRANSMIT_STATE;
+                    }
+                    else if (retransmitState == RECV_AFTER_RETRANMIT_STATE){
+                        retransmitState = RETRANSMIT_STATE;
+                        counter = 0;
+                    }
+                    else{
+
+                    }
+
                 }
             }
             else{

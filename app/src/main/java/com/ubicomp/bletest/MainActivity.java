@@ -1,4 +1,4 @@
-package com.example.bletest;
+package com.ubicomp.bletest;
 
 
 import android.app.Activity;
@@ -6,7 +6,6 @@ import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.os.Bundle;
-import android.os.Environment;
 import android.os.Handler;
 import android.os.Message;
 import android.text.InputType;
@@ -21,10 +20,14 @@ import android.widget.Toast;
 import org.opencv.android.OpenCVLoader;
 
 import java.math.BigDecimal;
+import java.util.Timer;
+import java.util.TimerTask;
 
 public class MainActivity extends Activity implements BluetoothListener {
 
     private static final String TAG = "BluetoothLE";
+    private static final double APP_VERSION = 1.00;
+
     public static final int PRECAPTURE_STATE = 0;
     public static final int CAPTURE_STATE = 1;
 
@@ -32,6 +35,7 @@ public class MainActivity extends Activity implements BluetoothListener {
     public static final int PICTURE_PREVIEW_MSG     = 1;
     public static final int SHOW_PREDICTION_MSG     = 2;
     public static final int DATA_TRANSFER_FAILURE_MSG   = 3;
+    public static final int SHOW_AVG_GRAY_VALUE = 4;
 
 
     MainActivity mainActivity = this;
@@ -41,7 +45,9 @@ public class MainActivity extends Activity implements BluetoothListener {
 
     private TextView progressDisplay;
     private TextView idDisplay;
+    private TextView versionDisplay;
     private TextView detectionResult;
+    private TextView avgROI;
     private Button buttonStart;
     private Button buttonPreCap;
     private Button buttonCap;
@@ -72,7 +78,9 @@ public class MainActivity extends Activity implements BluetoothListener {
         buttonWriteId = (Button)findViewById(R.id.buttonWriteId);
         progressDisplay = (TextView)findViewById(R.id.progressDisplay);
         idDisplay = (TextView)findViewById(R.id.idDisplay);
+        versionDisplay = (TextView)findViewById(R.id.versionDisplay);
         detectionResult = (TextView)findViewById(R.id.detectionResult);
+        avgROI = (TextView)findViewById(R.id.avgROI);
         imgPreview = (ImageView)findViewById(R.id.imgPreview);
         editTextId = (EditText)findViewById(R.id.editArea);
 
@@ -96,13 +104,18 @@ public class MainActivity extends Activity implements BluetoothListener {
                     case DATA_TRANSFER_FAILURE_MSG:
                         bleTakePictureFail(msg.getData().getFloat("dropout"));
                         break;
+                    case SHOW_AVG_GRAY_VALUE:
+                        showAvgGrayValue(msg.getData().getFloat("average"));
+                        break;
                 }
             }
         };
 
         progressDisplay.setText("");
         idDisplay.setText("");
+        versionDisplay.setText("");
         detectionResult.setText("");
+        avgROI.setText("");
         editTextId.setInputType(InputType.TYPE_CLASS_PHONE);
 
         buttonStart.setOnClickListener(new View.OnClickListener() {
@@ -160,6 +173,7 @@ public class MainActivity extends Activity implements BluetoothListener {
                     clearProgressRate();
                     imgPreview.setImageDrawable(null);
                     detectionResult.setText("");
+                    avgROI.setText("");
                 }
             }
 
@@ -251,6 +265,16 @@ public class MainActivity extends Activity implements BluetoothListener {
     public void bleConnected() {
     	Toast.makeText(this, "BLE connected", Toast.LENGTH_SHORT).show();
         Log.i(TAG, "BLE connected");
+        Timer timer = new Timer();
+        timer.schedule(new TimerTask(){
+
+            @Override
+            public void run() {
+                if(ble != null) {
+                    ble.bleWriteState((byte) 0x0A);
+                }
+            }
+        }, 2000);
         buttonStart.setEnabled(false);
         buttonPreCap.setEnabled(true);
         buttonCap.setEnabled(true);
@@ -274,7 +298,9 @@ public class MainActivity extends Activity implements BluetoothListener {
         buttonWriteId.setEnabled(false);
         clearProgressRate();
         idDisplay.setText("");
+        versionDisplay.setText("");
         detectionResult.setText("");
+        avgROI.setText("");
     }
 
     @Override
@@ -310,6 +336,14 @@ public class MainActivity extends Activity implements BluetoothListener {
     @Override
     public void displayCurrentId(String id) {
         idDisplay.setText("Saliva Id: " + id);
+    }
+
+    @Override
+    public void displayCurrentDeviceVersion(int version) {
+        versionDisplay.setText("Device code version: " + version);
+        if(ble != null){
+            ble.bleWriteState((byte) 0x01);
+        }
     }
 
     @Override
@@ -350,4 +384,8 @@ public class MainActivity extends Activity implements BluetoothListener {
         Log.i(TAG, "Take picture failed.");
     }
 
+    public void showAvgGrayValue(float value){
+        Double truncatedDouble = new BigDecimal(value).setScale(1, BigDecimal.ROUND_HALF_UP).doubleValue();
+        avgROI.setText("GrayValueAvg: " + truncatedDouble);
+    }
 }

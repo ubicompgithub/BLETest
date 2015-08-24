@@ -1,4 +1,4 @@
-package com.example.bletest;
+package com.ubicomp.bletest;
 
 import android.app.Activity;
 import android.graphics.Bitmap;
@@ -7,7 +7,6 @@ import android.os.Message;
 import android.util.Log;
 
 import org.opencv.android.Utils;
-import org.opencv.core.CvType;
 import org.opencv.core.Mat;
 import org.opencv.core.Point;
 import org.opencv.core.Scalar;
@@ -16,6 +15,7 @@ import org.opencv.imgproc.Imgproc;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
+import java.util.HashMap;
 import java.util.Vector;
 
 /**
@@ -29,8 +29,8 @@ public class ImageDetection {
     private static final int ROI_Y_MIN = 80;
     private static final int ROI_Y_MAX = 160;
 
-    private static final int DEFAULT_X_MIN = 45;
-    private static final int DEFAULT_X_MAX = 135;
+    private static final int DEFAULT_X_MIN = 50;
+    private static final int DEFAULT_X_MAX = 140;
     private static final int DEFAULT_Y_MIN = 20;
     private static final int DEFAULT_Y_MAX = 50;
 
@@ -46,28 +46,32 @@ public class ImageDetection {
 
     private static final int LBOUND_FIRST_LINE_RANGE = 20;
     private static final int UBOUND_FIRST_LINE_RANGE = 40;
+    private static final int SELECTIVITY_CONST = 3;
 
     private static final int FIRST_LINE_UNFOUND_PENALTY = 1;
     private static final int SECOND_LINE_UNFOUND_PENALTY = 1;
     private static final int FOUND_REWARD = 4;
+    private static final int ALLOWED_TEST_LINE_WIDTH = 2;
+
+    private static final int CHECK_BOUNDARY = 20;
 
     private static final float eps = (float) -0.000001;
 
     private Activity activity = null;
     private DataTransmission datatransmission = null;
 
-    private int xmin = ROI_X_MIN;
-    private int xmax = ROI_X_MAX;
-    private int ymin = ROI_Y_MIN;
-    private int ymax = ROI_Y_MAX;
+    private int xmin = DEFAULT_X_MIN;
+    private int xmax = DEFAULT_X_MAX;
+    private int ymin = DEFAULT_Y_MIN;
+    private int ymax = DEFAULT_Y_MAX;
 
 
-    public ImageDetection(Activity activity, DataTransmission datatransmission){
+    public ImageDetection(Activity activity, DataTransmission datatransmission) {
         this.activity = activity;
         this.datatransmission = datatransmission;
     }
 
-    public void roiDetectionOnWhite(Bitmap bitmap){
+    public void roiDetectionOnWhite(Bitmap bitmap) {
         Mat matOrigin = new Mat();
         Utils.bitmapToMat(bitmap, matOrigin);
 
@@ -79,7 +83,7 @@ public class ImageDetection {
         //Bitmap roiBmp = Bitmap.createBitmap(matROI.cols(), matROI.rows(), Bitmap.Config.ARGB_4444);
         //Utils.matToBitmap(matROI, roiBmp);
 
-        Bitmap roiBmp = Bitmap.createBitmap(bitmap, ROI_X_MIN, ROI_Y_MIN, ROI_X_MAX-ROI_X_MIN, ROI_Y_MAX-ROI_Y_MIN);
+        Bitmap roiBmp = Bitmap.createBitmap(bitmap, ROI_X_MIN, ROI_Y_MIN, ROI_X_MAX - ROI_X_MIN, ROI_Y_MAX - ROI_Y_MIN);
 
         int width = roiBmp.getWidth();
         int height = roiBmp.getHeight();
@@ -88,7 +92,7 @@ public class ImageDetection {
         int ySum = 0;
         int count = 0;
 
-        for(int i = 0; i < height; i++){
+        for (int i = 0; i < height; i++) {
             for (int j = 0; j < width; j++) {
                 int pixel = roiBmp.getPixel(j, i);
                 int value = ((pixel >> 16) & 0xff);
@@ -108,7 +112,7 @@ public class ImageDetection {
         ymin = yCenter - 15;
         ymax = yCenter + 15;
 
-        Log.i(TAG, "xmin: "+ xmin + ", xmax: " + xmax + ", ymin: " + ymin + ", ymax: " + ymax);
+        Log.i(TAG, "xmin: " + xmin + ", xmax: " + xmax + ", ymin: " + ymin + ", ymax: " + ymax);
 
         Point p1 = new Point(ROI_X_MIN + xmin, ROI_Y_MIN + ymin);
         Point p2 = new Point(ROI_X_MIN + xmin, ROI_Y_MIN + ymax);
@@ -146,28 +150,32 @@ public class ImageDetection {
     }
 
 
-    public boolean testStripDetection(Bitmap bitmap){
+    public boolean testStripDetection(Bitmap bitmap) {
 
         Bitmap roiBmp = Bitmap.createBitmap(bitmap, ROI_X_MIN + xmin + 2, ROI_Y_MIN + ymin + 1, xmax - xmin - 4, ymax - ymin - 2);
         int width = roiBmp.getWidth();
         int height = roiBmp.getHeight();
-        int middle = width/2;
+        int middle = width / 2;
+        int halfHeight = height / 2;
         Log.i(TAG, "width: " + width + " , height: " + height);
 
         Mat matROI = new Mat();
         Utils.bitmapToMat(roiBmp, matROI);
 
-
-        float [] x0 = new float[width];
-        float [] diff = new float[width-1];
-        float [] pivot = new float[width-2];
-        float validatity = 0;
+        float[] x0 = new float[width];
+        float[] diff = new float[width - 1];
+        float[] pivot = new float[width - 2];
+        float validity = 0;
         float check = 0;
+        float overallSum = 0;
+        float overallAvg = 0;
 
-        for(int i = 0; i < height; i++){
+        HashMap testLineVoteMap = new HashMap();
+
+        for (int i = 0; i < height; i++) {
             float maximum = 0;
             float minimum = 255;
-            float sumAll= 0;
+            float sumAll = 0;
             float sumAfterMiddle = 0;
             float maximumAfterMiddle = 0;
             float minimumAfterMiddle = 255;
@@ -178,67 +186,72 @@ public class ImageDetection {
                 int value = 255 - ((pixel >> 16) & 0xff);
                 x0[j] = value;
                 sumAll += x0[j];
-                if(j >= middle){
+                if (j >= middle) {
                     sumAfterMiddle += x0[j];
                 }
 
-                if( j > 0 ){
-                    diff[j-1] = x0[j] - x0[j-1];
-                    if (diff[j-1] == 0)
-                        diff[j-1] = eps;
+                if (j > 0) {
+                    diff[j - 1] = x0[j] - x0[j - 1];
+                    if (diff[j - 1] == 0)
+                        diff[j - 1] = eps;
                 }
 
-                if( j > 1 ){
-                    pivot[j-2] = diff[j-2] * diff[j-1];
-                    if( pivot[j-2] < 0 && diff[j-2] > 0 ){
-                        vector.add(j-1);
+                if (j > 1) {
+                    pivot[j - 2] = diff[j - 2] * diff[j - 1];
+                    if (pivot[j - 2] < 0 && diff[j - 2] > 0) {
+                        vector.add(j - 1);
                     }
                 }
 
-                if(x0[j] > maximum)
+                if (x0[j] > maximum)
                     maximum = x0[j];
 
-                if(x0[j] < minimum)
+                if (x0[j] < minimum)
                     minimum = x0[j];
 
-                if(j >= middle){
-                    if(x0[j] > maximumAfterMiddle)
+                if (j >= middle) {
+                    if (x0[j] > maximumAfterMiddle)
                         maximumAfterMiddle = x0[j];
 
-                    if(x0[j] < minimumAfterMiddle)
+                    if (x0[j] < minimumAfterMiddle)
                         minimumAfterMiddle = x0[j];
                 }
 
             }
-            float avgAll = sumAll /width;
-            if( (maximum - minimum) < MINIMAL_EFFECTIVE_RANGE ){
+            float avgAll = sumAll / width;
+            if( i > height/4 && i < 3*height/4 ){
+                overallSum += avgAll;
+            }
+
+            if ((maximum - minimum) < MINIMAL_EFFECTIVE_RANGE) {
                 Log.i(TAG, "Useless row.");
-                if( avgAll > LBOUND_EFFECTIVE_GRAYSCALE) {
-                    validatity -= NO_LINE_PENALTY;
+                if (avgAll > LBOUND_EFFECTIVE_GRAYSCALE) {
+                    validity -= NO_LINE_PENALTY;
                     //check -= 0.5;                               // Modified by larry on 7/27
                 }
                 continue;
             }
 
 
-            float avgAfterMiddle = sumAfterMiddle /middle;
-            float sel = (maximum-minimum)/4;
-            float selAfterMiddle = (maximumAfterMiddle-minimumAfterMiddle)/4;
+            float avgAfterMiddle = sumAfterMiddle / middle;
+            float sel = (maximum - minimum) / SELECTIVITY_CONST;
+            float selAfterMiddle;
+            if(i < halfHeight){
+                selAfterMiddle = (maximumAfterMiddle-minimumAfterMiddle)/SELECTIVITY_CONST;
+            }
+            else{
+                selAfterMiddle = (maximumAfterMiddle-minimumAfterMiddle)/(SELECTIVITY_CONST+10);
+            }
+
             float refCandidate = 0;
             boolean isFoundRef = false;
             int refIdx = 0;
             float secondMaximal = 0;
             int secondIdx = 0;
 
-//            Log.i(TAG, "Avg: " + String.valueOf(avgAll));
-//            Log.i(TAG, "AvgAfter50: " + String.valueOf(avgAfterMiddle));
-//            Log.i(TAG, "Sel: " + String.valueOf(sel));
-//            Log.i(TAG, "SelAfter50: " + String.valueOf(selAfterMiddle));
-
-
             Vector candidateVector = new Vector();
 //            Log.i(TAG, "K = " + vector.size());
-            for(int k= 0; k < vector.size(); k++) {
+            for (int k = 0; k < vector.size(); k++) {
                 int idx = (int) vector.get(k);
 
                 if (idx > LBOUND_FIRST_LINE_RANGE && idx <= UBOUND_FIRST_LINE_RANGE) {
@@ -258,11 +271,9 @@ public class ImageDetection {
                     }
                     if (refIdx == 0) {
                         Log.i(TAG, "Can't find refPoint in " + i + "th row.");
-                        validatity -= FIRST_LINE_UNFOUND_PENALTY;
-                        //check -= 1;
+                        validity -= FIRST_LINE_UNFOUND_PENALTY;
                         break;
-                    }
-                    else{
+                    } else {
                         Point point = new Point(refIdx, i);
                         Imgproc.circle(matROI, point, 1, new Scalar(0, 255, 0), 1);
                         isFoundRef = true;
@@ -281,11 +292,19 @@ public class ImageDetection {
                 if (k == vector.size() - 1) {
                     if (secondIdx != 0 && (secondIdx - refIdx) > LBOUND_BETWEEN_LINE && (secondIdx - refIdx) < UBOUND_BETWEEN_LINE) {
                         Log.i(TAG, "Second: " + secondIdx);
+
+                        int value = 1;
+                        if(testLineVoteMap.containsKey(secondIdx) == true){
+                            value = (int) testLineVoteMap.get(secondIdx);
+                            value++;
+                        }
+                        testLineVoteMap.put(secondIdx, value);
+
                         Point point = new Point(secondIdx, i);
                         Imgproc.circle(matROI, point, 1, new Scalar(0, 0, 255), 1);
-                        check += FOUND_REWARD;
+                        //check += FOUND_REWARD;
                     } else {
-                        Log.i(TAG, "Failed" );
+                        Log.i(TAG, "Failed");
                         check -= SECOND_LINE_UNFOUND_PENALTY;
                     }
                     break;
@@ -293,15 +312,44 @@ public class ImageDetection {
             }
         }
 
-        Log.i(TAG, "Validatity: " + String.valueOf(validatity));
-        if(validatity < VALID_THRESHOLD)
+        overallAvg = overallSum / (height/2);
+        Bundle countBundle = new Bundle();
+        countBundle.putFloat("average", overallAvg);
+        Message msg = new Message();
+        msg.what = MainActivity.SHOW_AVG_GRAY_VALUE;
+        msg.setData(countBundle);
+        ((MainActivity) activity).mHandler.sendMessage(msg);
+
+        if (!testLineVoteMap.isEmpty()){
+
+            int maxSecondIdx = 0;
+            int tempMaxSecondIdxNum = 0;
+            for (Object key : testLineVoteMap.keySet()) {
+                int value = (int)testLineVoteMap.get(key);
+                if( value > tempMaxSecondIdxNum){
+                    tempMaxSecondIdxNum = value;
+                    maxSecondIdx = (int) key;
+                }
+                Log.i(TAG, key + " : " + testLineVoteMap.get(key));
+            }
+
+            for (Object key : testLineVoteMap.keySet()) {
+                int candidateIdx = (int) key;
+                if( Math.abs(candidateIdx - maxSecondIdx) <= ALLOWED_TEST_LINE_WIDTH) {
+                    int value = (int) testLineVoteMap.get(key);
+                    check += (value * FOUND_REWARD);
+                }
+            }
+        }
+
+        Log.i(TAG, "Validatity: " + String.valueOf(validity));
+        if (validity < VALID_THRESHOLD)
             check = -1000;
 
-
         Log.i(TAG, "Check: " + String.valueOf(check));
-        Bundle countBundle = new Bundle();
+        countBundle = new Bundle();
         countBundle.putFloat("check", check);
-        Message msg = new Message();
+        msg = new Message();
         msg.what = MainActivity.SHOW_PREDICTION_MSG;
         msg.setData(countBundle);
         ((MainActivity) activity).mHandler.sendMessage(msg);
@@ -330,144 +378,11 @@ public class ImageDetection {
         }
 
 
-        if(check > 0)
+        if (check > CHECK_BOUNDARY)
             return true;
         else
             return false;
 
     }
 
-    /* Obsolete functions*/
-    //    public boolean roiDetection(Bitmap bitmap){
-//
-//        boolean result = false;
-//        Mat matOrigin = new Mat ();
-//        Utils.bitmapToMat(bitmap, matOrigin);
-//
-//        //Mat matOrigin = Imgcodecs.imread(filePath);
-//        Mat matROI = matOrigin.submat(ROI_Y_MIN, ROI_Y_MAX, ROI_X_MIN, ROI_X_MAX);
-//
-//        //matOrigin.release();
-//        Mat matClone = new Mat(matROI.cols(),matROI.rows(), CvType.CV_8UC1);
-//        Imgproc.cvtColor(matROI, matClone, Imgproc.COLOR_RGB2GRAY);
-//
-//        Mat matFilter = new Mat(matClone.cols(), matClone.rows(), CvType.CV_8UC3);
-//
-//        int filterSize = 8;
-//
-//        Mat kernel = new Mat(filterSize, filterSize, CvType.CV_32F);
-//        kernel.setTo(new Scalar((double)1 /(filterSize * filterSize)));
-//
-//        Imgproc.filter2D(matClone, matFilter, -1, kernel);
-//
-//        kernel.release();
-//        matROI.release();
-//        Mat matCanny = new Mat(matClone.cols(), matClone.rows(), CvType.CV_8UC1);
-//        Imgproc.Canny(matFilter, matCanny, 20, 100, 3, true);
-//        matFilter.release();
-//        Mat matLines = new Mat();
-//
-//        int houghThreshold = 20;
-//        int minLineSize = 10;
-//        int lineGap = 10;
-//        Imgproc.HoughLinesP(matCanny, matLines, 1, Math.PI/180, houghThreshold, lineGap , minLineSize);
-//
-//        matCanny.release();
-//        Log.i(TAG, "Num of lines: " + matLines.cols());   // Warning: The number of lines is different from java version.
-//
-//        xmin = ROI_X_MAX-ROI_X_MIN;
-//        xmax = 0;
-//        ymin = ROI_Y_MAX-ROI_Y_MIN;
-//        ymax = 0;
-//
-//        for (int x = 0; x < matLines.cols(); x++)
-//        {
-//            double[] vec = matLines.get(0, x);
-//            double  x1 = vec[0],
-//                    y1 = vec[1],
-//                    x2 = vec[2],
-//                    y2 = vec[3];
-//
-////            Log.i(TAG, "x1: "+ x1 + ", x2: " + x2 + ", y1: " + y1 + ", y2: " + y2);
-//            if( xmin > (int) Math.min(x1, x2))
-//                xmin = (int) Math.min(x1, x2);
-//            if( xmax < (int) Math.max(x1, x2))
-//                xmax = (int) Math.max(x1, x2);
-//            if( ymin > (int) Math.min(y1, y2))
-//                ymin = (int) Math.min(y1, y2);
-//            if( ymax < (int) Math.max(y1, y2))
-//                ymax = (int) Math.max(y1, y2);
-//
-//        }
-//
-//        Log.i(TAG, "xmin: "+ xmin + ", xmax: " + xmax + ", ymin: " + ymin + ", ymax: " + ymax);
-//        for(int i = 0; i < 2; i++) {
-//            if (ymax - ymin > 25 && ymax - ymin < 35) {
-//                if (xmax - xmin < 80) {
-//                    if (xmin > 55)
-//                        xmin = xmax - 90;
-//                    else if (xmax < 110)
-//                        xmax = xmin + 90;
-//                    else {
-//                    }
-//                }
-//                else if(xmax - xmin > 100){
-//                    if(Math.abs(xmin) < Math.abs(160-xmax))
-//                        xmin = xmax - 90;
-//                    else{
-//                        xmax = xmin + 90;
-//                    }
-//                }
-//                else{
-//                }
-//            }
-//
-//            if (xmax - xmin > 70) {
-//                if (ymax - ymin < 25) {
-//                    if (ymin > 50)
-//                        ymin = ymax - 30;
-//                    else if (ymax < 50)
-//                        ymax = ymin + 30;
-//                    else {
-//                    }
-//                } else if (ymax - ymin > 35) {
-//                    if (Math.abs(ymin) < Math.abs(100 - ymax))
-//                        ymin = ymax - 30;
-//                    else {
-//                        ymax = ymin + 30;
-//                    }
-//                }
-//                else{
-//                }
-//            }
-//        }
-//        Log.i(TAG, "xmin: " + xmin + ", xmax: " + xmax + ", ymin: " + ymin + ", ymax: " + ymax);
-//        if( ymax-ymin < 25 || xmax-xmin < 50){
-//           /* Handle exceptions*/
-//            xmin = DEFAULT_X_MIN; xmax = DEFAULT_X_MAX; ymin = DEFAULT_Y_MIN; ymax = DEFAULT_Y_MAX;
-//        }
-//        else{
-//            result = true;
-//        }
-//
-//        Point p1 = new Point(ROI_X_MIN + xmin, ROI_Y_MIN + ymin);
-//        Point p2 = new Point(ROI_X_MIN + xmin, ROI_Y_MIN + ymax);
-//        Point p3 = new Point(ROI_X_MIN + xmax, ROI_Y_MIN + ymin);
-//        Point p4 = new Point(ROI_X_MIN + xmax, ROI_Y_MIN + ymax);
-//
-//        Imgproc.line(matOrigin, p1, p2, new Scalar(255,0,0), 3);
-//        Imgproc.line(matOrigin, p2, p4, new Scalar(255,0,0), 3);
-//        Imgproc.line(matOrigin, p4, p3, new Scalar(255,0,0), 3);
-//        Imgproc.line(matOrigin, p3, p1, new Scalar(255,0,0), 3);
-//
-////        matROI = matClone.submat(ymin + 3, ymax - 3, xmin+3, xmax-3);
-////        Bitmap bmp = Bitmap.createBitmap(matROI.cols(), matROI.rows(), Bitmap.Config.ARGB_4444);
-////        Utils.matToBitmap(matROI, bmp);
-//
-//        Bitmap bmp = Bitmap.createBitmap(matOrigin.cols(), matOrigin.rows(), Bitmap.Config.ARGB_8888);
-//        Utils.matToBitmap(matOrigin, bmp);
-//
-//        ((BluetoothListener) activity).setImgPreview(bmp);
-//        return result;
-//    }
 }

@@ -1,4 +1,4 @@
-package com.example.bletest;
+package com.ubicomp.bletest;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
@@ -14,20 +14,14 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.ServiceConnection;
 import android.content.pm.PackageManager;
-import android.os.Environment;
 import android.os.Handler;
 import android.os.IBinder;
 import android.util.Log;
 import android.widget.Toast;
 
-import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileOutputStream;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.io.Writer;
 import java.sql.Timestamp;
-import java.util.Hashtable;
 import java.util.List;
 import java.util.UUID;
 
@@ -181,14 +175,14 @@ public class BluetoothLE {
 
             } else if (BluetoothLeService.ACTION_DATA_AVAILABLE.equals(action)) {
             	byte[] data = intent.getByteArrayExtra(BluetoothLeService.EXTRA_DATA);
-            	
-            	StringBuffer Sbuffer = new StringBuffer("");
-            	for(int ii=0; ii<data.length; ii++){
-            		//String s1 = String.format("%8s", Integer.toBinaryString(data[ii] & 0xFF)).replace(' ', '0');
-            		String s1 = Integer.toHexString(data[ii] & 0xFF);
-            		Sbuffer.append(s1 + ",");
-            	}
-            	Log.i(TAG, Sbuffer.toString());
+
+                StringBuffer Sbuffer = new StringBuffer("");
+                for(int ii=0; ii<data.length; ii++){
+                    //String s1 = String.format("%8s", Integer.toBinaryString(data[ii] & 0xFF)).replace(' ', '0');
+                    String s1 = Integer.toHexString(data[ii] & 0xFF);
+                    Sbuffer.append(s1 + ",");
+                }
+                Log.i(TAG, Sbuffer.toString());
 
 
                 if(data[0] == (byte)0xA9){
@@ -336,41 +330,12 @@ public class BluetoothLE {
                     long temp = (data[4] & 0xFF) + (data[3] & 0xFF)*256 + (data[2] & 0xFF)*256*256 + (data[1] & 0xFF)*256*256*256;
                     ((BluetoothListener) activity).displayCurrentId(String.valueOf(temp));
                 }
-//            	byte[] plugId = new byte[data.length-1];
-//            	System.arraycopy(data, 1, plugId, 0, data.length - 1);
-            	
-//                switch(data[0]) { // Handling notification depending on types
-//                    case (byte)0xFA:
-//                        Log.i(TAG, "----0xFA----");
-//                        ((BluetoothListener) activity).bleNoPlug();
-//                        break;
-//                    case (byte)0xFB:
-//                        Log.i(TAG, "----0xFB----");
-//                        byte[] plugId = new byte[data.length-1];
-//                        System.arraycopy(data, 1, plugId, 0, data.length - 1);
-//                        ((BluetoothListener) activity).blePlugInserted(plugId);
-//                        break;
-//                    case (byte)0xFC:
-//                    case (byte)0xFD:
-//                    case (byte)0xFE:
-//                        byte[] adcReading = new byte[data.length-1];
-//                        System.arraycopy(data, 1, adcReading, 0, data.length - 1);
-//                        ((BluetoothListener) activity).bleElectrodeAdcReading(data[0], adcReading);
-//                        break;
-//
-//                    case (byte)0xFF:
-//                        Log.i(TAG, "----0xFF----");
-//                        byte[] colorReadings = new byte[data.length-1];
-//                        System.arraycopy(data, 1, colorReadings, 0, data.length-1);
-//                        ((BluetoothListener) activity).bleColorReadings(colorReadings);
-//                        break;
-//                }
+                else if (data[0] == (byte)0xDD){
+                    int deviceVersion = (data[1] & 0xFF);
+                    ((BluetoothListener) activity).displayCurrentDeviceVersion(deviceVersion);
+                }
 
-//                int color_sensor0[] = new int[4];
-//                int color_sensor1[] = new int[4];
-//                for(int i=0; i<4; i++) {
-//                    color_sensor0[i] = data[(i*2)+1]<<8 + data[i*2];
-//                    color_sensor1[i] = data[(i*2)+9]<<8 + data[i*2+8];
+
                 
 
             } else{

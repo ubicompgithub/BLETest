@@ -1,8 +1,7 @@
-package com.example.bletest;
+package com.ubicomp.bletest;
 
 import android.app.Activity;
 import android.content.Intent;
-import android.graphics.Bitmap;
 
 
 public interface BluetoothListener {
@@ -47,4 +46,7 @@ public interface BluetoothListener {
 
     /* Display current saliva Id*/
     void displayCurrentId(String id);
+
+    /* Display device version*/
+    void displayCurrentDeviceVersion(int version);
 }
