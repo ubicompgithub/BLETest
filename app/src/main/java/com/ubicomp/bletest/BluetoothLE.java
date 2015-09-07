@@ -182,7 +182,7 @@ public class BluetoothLE {
                     String s1 = Integer.toHexString(data[ii] & 0xFF);
                     Sbuffer.append(s1 + ",");
                 }
-                Log.i(TAG, Sbuffer.toString());
+                //Log.i(TAG, Sbuffer.toString());
 
 
                 if(data[0] == (byte)0xA9){
@@ -329,6 +329,11 @@ public class BluetoothLE {
                 else if (data[0] == (byte)0xFB){
                     long temp = (data[4] & 0xFF) + (data[3] & 0xFF)*256 + (data[2] & 0xFF)*256*256 + (data[1] & 0xFF)*256*256*256;
                     ((BluetoothListener) activity).displayCurrentId(String.valueOf(temp));
+                }
+                else if (data[0] == (byte)0xFC){
+                    /*TODO*/
+                    int voltage =  (data[1] & 0xFF) + (data[2] & 0xFF)*256;
+                    ((BluetoothListener) activity).displayCurrentVoltage(voltage);
                 }
                 else if (data[0] == (byte)0xDD){
                     int deviceVersion = (data[1] & 0xFF);

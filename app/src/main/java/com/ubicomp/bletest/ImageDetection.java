@@ -7,6 +7,7 @@ import android.os.Message;
 import android.util.Log;
 
 import org.opencv.android.Utils;
+import org.opencv.core.CvType;
 import org.opencv.core.Mat;
 import org.opencv.core.Point;
 import org.opencv.core.Scalar;
@@ -34,7 +35,7 @@ public class ImageDetection {
     private static final int DEFAULT_Y_MIN = 20;
     private static final int DEFAULT_Y_MAX = 50;
 
-    private static final int WHITE_THRESHOLD = 200;
+    private static final int WHITE_THRESHOLD = 180;
     private static final int VALID_THRESHOLD = -15;
     private static final int MINIMAL_EFFECTIVE_RANGE = 20;
 
@@ -53,18 +54,24 @@ public class ImageDetection {
     private static final int FOUND_REWARD = 4;
     private static final int ALLOWED_TEST_LINE_WIDTH = 2;
 
-    private static final int CHECK_BOUNDARY = 20;
+    private static final int CHECK_BOUNDARY = 0;
 
     private static final float eps = (float) -0.000001;
 
     private Activity activity = null;
     private DataTransmission datatransmission = null;
+    private String debugURL = null;
 
     private int xmin = DEFAULT_X_MIN;
     private int xmax = DEFAULT_X_MAX;
     private int ymin = DEFAULT_Y_MIN;
     private int ymax = DEFAULT_Y_MAX;
 
+    public ImageDetection(Activity activity, String url) {
+
+        this.activity = activity;
+        this.debugURL = url;
+    }
 
     public ImageDetection(Activity activity, DataTransmission datatransmission) {
         this.activity = activity;
@@ -75,15 +82,15 @@ public class ImageDetection {
         Mat matOrigin = new Mat();
         Utils.bitmapToMat(bitmap, matOrigin);
 
-        //Mat matROI = matOrigin.submat(ROI_Y_MIN, ROI_Y_MAX, ROI_X_MIN, ROI_X_MAX);
+        Mat matROI = matOrigin.submat(ROI_Y_MIN, ROI_Y_MAX, ROI_X_MIN, ROI_X_MAX);
 
-        //Mat matClone = new Mat(matROI.cols(),matROI.rows(), CvType.CV_8UC1);
-        //Imgproc.cvtColor(matROI, matClone, Imgproc.COLOR_RGB2GRAY);
+        Mat matClone = new Mat(matROI.cols(),matROI.rows(), CvType.CV_8UC1);
+        Imgproc.cvtColor(matROI, matClone, Imgproc.COLOR_RGB2GRAY);
 
-        //Bitmap roiBmp = Bitmap.createBitmap(matROI.cols(), matROI.rows(), Bitmap.Config.ARGB_4444);
-        //Utils.matToBitmap(matROI, roiBmp);
+        Bitmap roiBmp = Bitmap.createBitmap(matROI.cols(), matROI.rows(), Bitmap.Config.ARGB_4444);
+        Utils.matToBitmap(matROI, roiBmp);
 
-        Bitmap roiBmp = Bitmap.createBitmap(bitmap, ROI_X_MIN, ROI_Y_MIN, ROI_X_MAX - ROI_X_MIN, ROI_Y_MAX - ROI_Y_MIN);
+//        Bitmap roiBmp = Bitmap.createBitmap(bitmap, ROI_X_MIN, ROI_Y_MIN, ROI_X_MAX - ROI_X_MIN, ROI_Y_MAX - ROI_Y_MIN);
 
         int width = roiBmp.getWidth();
         int height = roiBmp.getHeight();
@@ -97,9 +104,9 @@ public class ImageDetection {
                 int pixel = roiBmp.getPixel(j, i);
                 int value = ((pixel >> 16) & 0xff);
                 if (value > WHITE_THRESHOLD) {
-                    xSum += j;
-                    ySum += i;
-                    count++;
+                    xSum += j*value;
+                    ySum += i*value;
+                    count += value;
                 }
             }
         }
@@ -128,8 +135,15 @@ public class ImageDetection {
         Bitmap bmp = Bitmap.createBitmap(matOrigin.cols(), matOrigin.rows(), Bitmap.Config.ARGB_8888);
         Utils.matToBitmap(matOrigin, bmp);
 
-        String picturePath = datatransmission.file.getAbsolutePath();
-        String roiPath = picturePath.substring(0, picturePath.lastIndexOf(".")).concat("_1.jpg");
+
+        String roiPath = null;
+        if (datatransmission != null){
+            String picturePath = datatransmission.file.getAbsolutePath();
+            roiPath = picturePath.substring(0, picturePath.lastIndexOf(".")).concat("_1.jpg");
+        }
+        else{
+            roiPath = debugURL.substring(0, debugURL.lastIndexOf(".")).concat("_8.jpg");
+        }
 
         File file = new File(roiPath); // the File to save to
         FileOutputStream fout = null;
@@ -147,6 +161,7 @@ public class ImageDetection {
         } catch (FileNotFoundException e) {
             e.printStackTrace();
         }
+
     }
 
 
@@ -236,12 +251,9 @@ public class ImageDetection {
             float avgAfterMiddle = sumAfterMiddle / middle;
             float sel = (maximum - minimum) / SELECTIVITY_CONST;
             float selAfterMiddle;
-            if(i < halfHeight){
-                selAfterMiddle = (maximumAfterMiddle-minimumAfterMiddle)/SELECTIVITY_CONST;
-            }
-            else{
-                selAfterMiddle = (maximumAfterMiddle-minimumAfterMiddle)/(SELECTIVITY_CONST+10);
-            }
+
+            selAfterMiddle = (maximumAfterMiddle-minimumAfterMiddle)/(SELECTIVITY_CONST+10);
+
 
             float refCandidate = 0;
             boolean isFoundRef = false;
@@ -355,8 +367,14 @@ public class ImageDetection {
         ((MainActivity) activity).mHandler.sendMessage(msg);
 
 
-        String picturePath = datatransmission.file.getAbsolutePath();
-        String roiPath = picturePath.substring(0, picturePath.lastIndexOf(".")).concat("_2.jpg");
+        String roiPath = null;
+        if (datatransmission != null){
+            String picturePath = datatransmission.file.getAbsolutePath();
+            roiPath = picturePath.substring(0, picturePath.lastIndexOf(".")).concat("_2.jpg");
+        }
+        else{
+            roiPath = debugURL.substring(0, debugURL.lastIndexOf(".")).concat("_9.jpg");
+        }
 
         File file = new File(roiPath); // the File to save to
         FileOutputStream fout = null;

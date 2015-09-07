@@ -51,6 +51,12 @@
         android:layout_height="wrap_content"
         android:text="Write Id" />
 
+    <Button
+        android:id="@+id/buttonVoltage"
+        android:layout_width="130sp"
+        android:layout_height="wrap_content"
+        android:text="Get Voltage" />
+
     <TextView
         android:id="@+id/progressDisplay"
         android:layout_width="wrap_content"

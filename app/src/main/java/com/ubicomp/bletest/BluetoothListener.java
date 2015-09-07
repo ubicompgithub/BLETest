@@ -47,6 +47,9 @@ public interface BluetoothListener {
     /* Display current saliva Id*/
     void displayCurrentId(String id);
 
+    /* Display current saliva Id*/
+    void displayCurrentVoltage(int voltage);
+
     /* Display device version*/
     void displayCurrentDeviceVersion(int version);
 }

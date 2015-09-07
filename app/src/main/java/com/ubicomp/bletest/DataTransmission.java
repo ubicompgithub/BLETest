@@ -209,12 +209,8 @@ public class DataTransmission {
                 ByteArrayInputStream inputStream = new ByteArrayInputStream(pictureBytes);
                 Bitmap bitmap = BitmapFactory.decodeStream(inputStream, null, bmpFactoryOptions);
 
-
-
                 bufOffset = 0;
                 picInfoPktRecv = false;
-
-
 
                 try {
                     fos.close();
@@ -238,8 +234,6 @@ public class DataTransmission {
 
                         imageDetection.testStripDetection(bitmap);
                     }
-
-
 
                     resetParameters();
                 } catch (IOException e2) {

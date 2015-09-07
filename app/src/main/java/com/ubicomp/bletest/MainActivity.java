@@ -6,6 +6,7 @@ import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.Handler;
 import android.os.Message;
 import android.text.InputType;
@@ -18,7 +19,11 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import org.opencv.android.OpenCVLoader;
+import org.opencv.core.Mat;
+import org.opencv.imgcodecs.Imgcodecs;
+import org.opencv.imgproc.Imgproc;
 
+import java.io.File;
 import java.math.BigDecimal;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -54,6 +59,7 @@ public class MainActivity extends Activity implements BluetoothListener {
     private Button buttonClose;
     private Button buttonReset;
     private Button buttonWriteId;
+    private Button buttonVoltage;
     private ImageView imgPreview;
     private EditText editTextId;
 
@@ -76,6 +82,7 @@ public class MainActivity extends Activity implements BluetoothListener {
         buttonClose = (Button)findViewById(R.id.buttonClose);
         buttonReset = (Button)findViewById(R.id.buttonReset);
         buttonWriteId = (Button)findViewById(R.id.buttonWriteId);
+        buttonVoltage = (Button)findViewById(R.id.buttonVoltage);
         progressDisplay = (TextView)findViewById(R.id.progressDisplay);
         idDisplay = (TextView)findViewById(R.id.idDisplay);
         versionDisplay = (TextView)findViewById(R.id.versionDisplay);
@@ -125,22 +132,18 @@ public class MainActivity extends Activity implements BluetoothListener {
                 if (ble != null) {
                     return;
                 }
-                //ble = new BluetoothLE(mainActivity, "ket_004");
                 String inputStr = editTextId.getText().toString();
                 Log.d(TAG, "Input str = " + inputStr);
-                if (inputStr == ""){
-                    return;
-                }
                 try {
                     int inputNum = Integer.valueOf(inputStr);
                     ble = new BluetoothLE(mainActivity, "ket_" + (inputNum % 1000) / 100 + (inputNum % 100) / 10 + inputNum % 10);
                     ble.bleConnect();
-                }
-                catch(Exception e){
+                } catch (Exception e) {
                     e.printStackTrace();
+                    //Log.d(TAG, "Enter picture debug section.");
+                    //loadPictureDebug("1441059772306");
                     return;
                 }
-                //testOpencv();
             }
 
         });
@@ -184,8 +187,7 @@ public class MainActivity extends Activity implements BluetoothListener {
             @Override
             public void onClick(View v) {
                 if (ble != null) {
-                    ble.bleDisconnect();
-                    ble = null;
+                    ble.bleWriteState((byte)0x05);
                 }
             }
 
@@ -224,11 +226,23 @@ public class MainActivity extends Activity implements BluetoothListener {
             }
         });
 
+        buttonVoltage.setOnClickListener(new View.OnClickListener(){
+
+            @Override
+            public void onClick(View view) {
+
+                if (ble != null){
+                    ble.bleWriteState((byte)0x02);
+                }
+            }
+        });
+
         buttonPreCap.setEnabled(false);
         buttonCap.setEnabled(false);
         buttonClose.setEnabled(false);
         buttonReset.setEnabled(false);
         buttonWriteId.setEnabled(false);
+        buttonVoltage.setEnabled(false);
         Log.i(TAG, "On create");
 
     }
@@ -281,6 +295,7 @@ public class MainActivity extends Activity implements BluetoothListener {
         buttonClose.setEnabled(true);
         buttonReset.setEnabled(true);
         buttonWriteId.setEnabled(true);
+        buttonVoltage.setEnabled(true);
     }
 
     @Override
@@ -296,6 +311,7 @@ public class MainActivity extends Activity implements BluetoothListener {
         buttonClose.setEnabled(false);
         buttonReset.setEnabled(false);
         buttonWriteId.setEnabled(false);
+        buttonVoltage.setEnabled(false);
         clearProgressRate();
         idDisplay.setText("");
         versionDisplay.setText("");
@@ -339,6 +355,11 @@ public class MainActivity extends Activity implements BluetoothListener {
     }
 
     @Override
+    public void displayCurrentVoltage(int voltage) {
+        detectionResult.setText("Voltage: " + voltage);
+    }
+
+    @Override
     public void displayCurrentDeviceVersion(int version) {
         versionDisplay.setText("Device code version: " + version);
         if(ble != null){
@@ -374,9 +395,11 @@ public class MainActivity extends Activity implements BluetoothListener {
 
     public void bleTakePictureSuccess(Bitmap bitmap) {
         //Toast.makeText(this, "Take picture successfully.", Toast.LENGTH_SHORT).show();
-        Log.i(TAG, "Take picture successfully.");
-        buttonPreCap.setEnabled(true);
-        buttonCap.setEnabled(true);
+        if (ble != null){
+            Log.i(TAG, "Take picture successfully.");
+            buttonPreCap.setEnabled(true);
+            buttonCap.setEnabled(true);
+        }
     }
 
     public void bleTakePictureFail(float dropRate) {
@@ -387,5 +410,32 @@ public class MainActivity extends Activity implements BluetoothListener {
     public void showAvgGrayValue(float value){
         Double truncatedDouble = new BigDecimal(value).setScale(1, BigDecimal.ROUND_HALF_UP).doubleValue();
         avgROI.setText("GrayValueAvg: " + truncatedDouble);
+    }
+
+    public void loadPictureDebug(String name){
+        File mainStorage = new File(Environment.getExternalStorageDirectory(), "TempPicDir");
+        File file1 = new File(mainStorage, "PIC_".concat(name).concat("_1.jpg"));
+        File file2 = new File(mainStorage, "PIC_".concat(name).concat("_4.jpg"));
+
+        Log.i(TAG, file1.getAbsolutePath());
+
+        Bitmap bitmap1;
+        Bitmap bitmap2;
+        if(file1.exists()){
+            bitmap1 = BitmapFactory.decodeFile(file1.getAbsolutePath());
+        }
+        else{
+            return;
+        }
+        if(file2.exists()){
+            bitmap2 = BitmapFactory.decodeFile(file2.getAbsolutePath());
+        }
+        else{
+            return;
+        }
+
+        ImageDetection imgDetection = new ImageDetection(this, "/storage/emulated/0/TempPicDir/PIC_".concat(name).concat(".jpg"));
+        imgDetection.roiDetectionOnWhite(bitmap1);
+        imgDetection.testStripDetection(bitmap2);
     }
 }
